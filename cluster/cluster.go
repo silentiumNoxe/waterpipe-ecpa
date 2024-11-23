@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/silentiumNoxe/goripple/sm"
 	"log/slog"
 	"sync"
@@ -40,7 +41,7 @@ func New(cfg *Config) *Cluster {
 		id:    cfg.Id,
 		out:   cfg.Out,
 		peers: cfg.Peers,
-		state: sm.New(cfg.db),
+		state: sm.New(cfg.DB),
 		port:  cfg.Port,
 		wg:    cfg.WaitGroup,
 		log:   cfg.Logger,
@@ -55,10 +56,14 @@ func (c *Cluster) Store(message []byte) error {
 
 	payload := make([]byte, 41)
 	payload[0] = byte(MessageOpcode) // cmd "message"
-	binary.LittleEndian.AppendUint32(payload, c.id)
-	binary.LittleEndian.AppendUint32(payload, msg.Id())
-	payload = append(payload, msg.Checksum()...)
+	binary.BigEndian.PutUint32(payload[1:5], c.id)
+	binary.BigEndian.PutUint32(payload[5:9], msg.Id())
 
+	for i, b := range msg.Checksum() {
+		payload[i+10] = b
+	}
+
+	c.log.Info(fmt.Sprintf("Broadcast message payload=%v", message))
 	c.broadcast(c.peers, payload)
 
 	return nil

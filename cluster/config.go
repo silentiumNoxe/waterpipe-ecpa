@@ -9,7 +9,7 @@ import (
 type Config struct {
 	Id  uint32
 	Out Outcome
-	db  sm.MessageDB
+	DB  sm.MessageDB
 
 	Peers     []string
 	Port      string

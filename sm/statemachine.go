@@ -78,5 +78,7 @@ func (sm *StateMachine) Commit(id uint32) error {
 }
 
 func checksum(src []byte) []byte {
-	return sha256.New().Sum(src)
+	h := sha256.New()
+	h.Write(src)
+	return h.Sum(nil)
 }
