@@ -56,7 +56,7 @@ func (sm *StateMachine) Accept(id uint32, checksum []byte) (bool, error) {
 		return msg.quorum >= sm.Quorum(), nil
 	}
 
-	sm.log.Info("[SM] Accept message", "offset", id)
+	sm.log.Info("[SM] Accept message", "offset", id, "quorum", fmt.Sprintf("%d/%d", 1, sm.Quorum()))
 	sm.mux.Lock()
 	sm.m[id] = &Message{id, nil, checksum, AcceptedState, time.Now(), 1}
 	sm.mux.Unlock()

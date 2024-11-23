@@ -1,6 +1,8 @@
 package sm
 
 import (
+	"encoding/hex"
+	"fmt"
 	"time"
 )
 
@@ -39,6 +41,17 @@ func (m Message) Timestamp() time.Time {
 
 func (m Message) IsCommitted() bool {
 	return m.state == CommittedState
+}
+
+func (m Message) String() string {
+	return fmt.Sprintf(
+		"{offset: %d, data: %s, checksum: %s, state: %d, timestamp: %v}",
+		m.id,
+		m.data,
+		hex.EncodeToString(m.checksum),
+		m.state,
+		m.timestamp,
+	)
 }
 
 type State byte

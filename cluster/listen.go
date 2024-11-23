@@ -5,19 +5,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/silentiumNoxe/goripple/sm"
-	"log/slog"
 )
 
 func (c *Cluster) OnMessage(addr string, message []byte) error {
 	opcode := Opcode(message[0])
 	clusterId := binary.BigEndian.Uint32(message[1:5])
-	c.log.Info(
-		fmt.Sprintf("Received message"),
-		slog.String("addr", addr),
-		slog.Int("len", len(message)),
-		slog.Int("opcode", int(opcode)),
-		slog.Int("clusterId", int(clusterId)),
-	)
 	if c.id != clusterId {
 		return fmt.Errorf("invalid cluster id")
 	}
@@ -27,6 +19,9 @@ func (c *Cluster) OnMessage(addr string, message []byte) error {
 	}
 	if opcode == SyncOpcode {
 		return c.processSyncOpcode(message[5:])
+	}
+	if opcode == SyncEchoOpcode {
+		return c.processSyncEchoOpcode(message[5:])
 	}
 
 	return fmt.Errorf("unsupported opcode %d", opcode)
@@ -62,7 +57,7 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 
 	if ready {
 		if msg[0].State() == sm.PreparedState {
-			if err := c.state.Commit(offsetId); err != nil {
+			if err := c.state.Apply(offsetId, msg[0].Data()); err != nil {
 				return err
 			}
 		} else if msg[0].State() == sm.AcceptedState {
@@ -112,12 +107,11 @@ func (c *Cluster) processSyncOpcode(message []byte) error {
 			Checksum:  checksum,
 		},
 	)
-
 	if err != nil {
 		return err
 	}
 
-	if len(msg) > 1 && msg[0].Data() != nil {
+	if len(msg) > 0 && msg[0].Data() != nil {
 		c.wg.Add(1)
 		go func() {
 			defer c.wg.Done()
@@ -127,7 +121,7 @@ func (c *Cluster) processSyncOpcode(message []byte) error {
 			binary.BigEndian.PutUint32(req[5:9], offsetId)
 			copy(req[9:], msg[0].Data())
 			c.log.Info("Send sync echo opcode", "offset", offsetId)
-			c.broadcast(c.state.Peers(), message)
+			c.broadcast(c.state.Peers(), req)
 		}()
 	}
 
