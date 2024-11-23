@@ -176,7 +176,7 @@ func (sm *StateMachine) Peers() []string {
 }
 
 func (sm *StateMachine) Quorum() int {
-	return int(math.Ceil(float64(len(sm.peers) / 2)))
+	return int(math.Ceil(float64(len(sm.peers)+1) / float64(2)))
 }
 
 func checksum(src []byte) []byte {
