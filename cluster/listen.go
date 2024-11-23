@@ -98,8 +98,8 @@ func (c *Cluster) requestPayload(offsetId uint32, checksum []byte) {
 }
 
 func (c *Cluster) processSyncOpcode(message []byte) error {
-	offsetId := binary.BigEndian.Uint32(message[4:8])
-	checksum := message[8:]
+	offsetId := binary.BigEndian.Uint32(message[0:4])
+	checksum := message[4:]
 
 	if len(checksum) < 32 {
 		return fmt.Errorf("wrong checksum size (%d)", len(checksum))
@@ -134,8 +134,8 @@ func (c *Cluster) processSyncOpcode(message []byte) error {
 }
 
 func (c *Cluster) processSyncEchoOpcode(message []byte) error {
-	offsetId := binary.BigEndian.Uint32(message[4:8])
-	data := message[8:]
+	offsetId := binary.BigEndian.Uint32(message[0:4])
+	data := message[4:]
 
 	msg, err := c.state.Lookup(
 		sm.LookupCriteria{
