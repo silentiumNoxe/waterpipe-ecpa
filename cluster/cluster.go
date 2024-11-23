@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"github.com/silentiumNoxe/goripple/sm"
@@ -22,26 +23,28 @@ const (
 type Cluster struct {
 	id uint32
 
-	out Outcome
-
-	state *sm.StateMachine
-
-	wait time.Duration
-	port string
+	out         Outcome
+	state       *sm.StateMachine
+	waitTimeout time.Duration
+	port        string
 
 	log    *slog.Logger
 	wg     *sync.WaitGroup
 	stopCh chan struct{}
 }
 
-func New(cfg *Config) *Cluster {
+func New(ctx context.Context, cfg *Config) *Cluster {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
+
+	state := sm.New(cfg.DB, cfg.Peers, cfg.WaitTimeout, 10, cfg.Logger)
+	go state.Monitor(ctx)
+
 	return &Cluster{
 		id:    cfg.Id,
 		out:   cfg.Out,
-		state: sm.New(cfg.DB, cfg.Peers, cfg.Logger),
+		state: state,
 		port:  cfg.Port,
 		wg:    cfg.WaitGroup,
 		log:   cfg.Logger,

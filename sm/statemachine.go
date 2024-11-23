@@ -2,6 +2,7 @@ package sm
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"log/slog"
@@ -15,12 +16,51 @@ type StateMachine struct {
 	m     map[uint32]*Message
 	peers []string
 
-	mux sync.RWMutex
-	log *slog.Logger
+	wt       time.Duration
+	expStack int
+	mux      sync.RWMutex
+	log      *slog.Logger
 }
 
-func New(db MessageDB, peers []string, log *slog.Logger) *StateMachine {
-	return &StateMachine{db: db, m: make(map[uint32]*Message), peers: peers, log: log}
+func New(db MessageDB, peers []string, wt time.Duration, expStack int, log *slog.Logger) *StateMachine {
+	return &StateMachine{db: db, m: make(map[uint32]*Message), peers: peers, wt: wt, expStack: expStack, log: log}
+}
+
+func (sm *StateMachine) Monitor(ctx context.Context) {
+	var stop = false
+	go func() {
+		<-ctx.Done()
+		stop = true
+	}()
+
+	for {
+		if stop {
+			return
+		}
+
+		var i = 0
+		var arr = make([]*Message, sm.expStack)
+
+		var exp = time.Now().Add(-sm.wt)
+
+		sm.mux.RLock()
+		for _, msg := range sm.m {
+			if msg.timestamp.After(exp) {
+				arr[i] = msg
+			}
+		}
+		sm.mux.RUnlock()
+
+		if len(arr) == 0 {
+			continue
+		}
+
+		sm.mux.Lock()
+		for _, msg := range arr {
+			delete(sm.m, msg.id)
+		}
+		sm.mux.Unlock()
+	}
 }
 
 // Prepare - initiator accept request from client and create new message
