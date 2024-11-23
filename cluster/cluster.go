@@ -1,10 +1,18 @@
 package cluster
 
 import (
+	"encoding/binary"
 	"github.com/silentiumNoxe/goripple/sm"
 	"log/slog"
 	"sync"
 	"time"
+)
+
+type Opcode byte
+
+const (
+	HeathbeatOpcode = iota + 1
+	MessageOpcode
 )
 
 // Cluster main structure of consensus machine
@@ -40,30 +48,19 @@ func New(cfg *Config) *Cluster {
 }
 
 func (c *Cluster) Store(message []byte) error {
-	c.broadcast(c.peers, message)
-	//reg, err := c.sm.Register(message)
-	//if err != nil {
-	//	return fmt.Errorf("failed register message: %w", err)
-	//}
-	//
-	//for _, peer := range c.peers {
-	//	c.wg.Add(1)
-	//	go func(reg *goripple.Message) {
-	//		defer c.wg.Done()
-	//		payload := make([]byte, 41)
-	//		payload[0] = 1 // cmd "message"
-	//		binary.LittleEndian.AppendUint32(payload, c.id)
-	//		binary.LittleEndian.AppendUint32(payload, reg.Id())
-	//		payload = append(payload, reg.Checksum()...)
-	//		if err := c.pub.Message(peer, payload); err != nil {
-	//			c.log.Warn(
-	//				"failed to send message to peer",
-	//				"peer", peer,
-	//				"err", err,
-	//			)
-	//		}
-	//	}(reg)
-	//}
+	msg, err := c.state.Prepare(message)
+	if err != nil {
+		return err
+	}
+
+	payload := make([]byte, 41)
+	payload[0] = byte(MessageOpcode) // cmd "message"
+	binary.LittleEndian.AppendUint32(payload, c.id)
+	binary.LittleEndian.AppendUint32(payload, msg.Id())
+	payload = append(payload, msg.Checksum()...)
+
+	c.broadcast(c.peers, payload)
+
 	return nil
 }
 

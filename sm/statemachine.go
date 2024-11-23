@@ -17,14 +17,15 @@ func New(db MessageDB) *StateMachine {
 }
 
 // Prepare - initiator accept request from client and create new message
-func (sm *StateMachine) Prepare(message []byte) error {
+func (sm *StateMachine) Prepare(message []byte) (*Message, error) {
 	offset, err := sm.db.Offset()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	offset++
-	sm.m[offset] = &Message{offset, message, checksum(message), PreparedState, time.Now()}
-	return nil
+	msg := &Message{offset, message, checksum(message), PreparedState, time.Now()}
+	sm.m[offset] = msg
+	return msg, nil
 }
 
 // Accept - initiator publish request to the other with information about new message
