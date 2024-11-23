@@ -11,13 +11,13 @@ type MessageDB interface {
 	Update(id uint32, message *Message) error
 	Drop(id uint32) error
 
-	Lookup(criteria LookupCriteria)
+	Lookup(criteria LookupCriteria) ([]*Message, error)
 }
 
 type LookupCriteria struct {
-	Ids      []uint32
-	States   []State
-	Checksum []byte
-	Before   time.Time
-	After    time.Time
+	OffsetIds []uint32
+	States    []State
+	Checksum  []byte
+	Before    time.Time
+	After     time.Time
 }
