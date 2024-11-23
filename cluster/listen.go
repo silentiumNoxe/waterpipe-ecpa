@@ -10,13 +10,13 @@ func (c *Cluster) OnMessage(addr string, message []byte) error {
 	c.log.Info(fmt.Sprintf("Received message %v", message), "addr", addr, "length", len(message))
 	opcode := Opcode(message[0])
 	if opcode == MessageOpcode {
-		return c.processMessage(message)
+		return c.processMessageOpcode(message)
 	}
 
 	return fmt.Errorf("unsupported opcode %d", opcode)
 }
 
-func (c *Cluster) processMessage(message []byte) error {
+func (c *Cluster) processMessageOpcode(message []byte) error {
 	clusterId := binary.BigEndian.Uint32(message[1:5])
 	offsetId := binary.BigEndian.Uint32(message[5:9])
 	checksum := message[9:]
