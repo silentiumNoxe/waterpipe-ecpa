@@ -32,11 +32,11 @@ func (c *Cluster) OnMessage(addr string, message []byte) error {
 }
 
 func (c *Cluster) processMessageOpcode(message []byte) error {
-	offsetId := binary.BigEndian.Uint32(message[4:8])
-	checksum := message[8:]
+	offsetId := binary.BigEndian.Uint32(message[0:4])
+	checksum := message[4:]
 
 	if len(checksum) < 32 {
-		return fmt.Errorf("wrong checksum size")
+		return fmt.Errorf("wrong checksum size (%d)", len(checksum))
 	}
 
 	msg, err := c.state.Lookup(
@@ -70,6 +70,7 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 	}
 
 	if len(msg) == 0 {
+		c.log.Info("Send message opcode echo")
 		c.wg.Add(1)
 		go func() {
 			defer c.wg.Done()
@@ -86,6 +87,7 @@ func (c *Cluster) requestPayload(offsetId uint32, checksum []byte) {
 	binary.BigEndian.PutUint32(request[1:5], c.id)
 	binary.BigEndian.PutUint32(request[5:9], offsetId)
 	copy(request, checksum)
+	c.log.Info("Send sync opcode")
 	c.broadcast(c.state.Peers(), request)
 }
 
@@ -94,7 +96,7 @@ func (c *Cluster) processSyncOpcode(message []byte) error {
 	checksum := message[8:]
 
 	if len(checksum) < 32 {
-		return fmt.Errorf("wrong checksum size")
+		return fmt.Errorf("wrong checksum size (%d)", len(checksum))
 	}
 
 	msg, err := c.state.Lookup(
@@ -117,6 +119,7 @@ func (c *Cluster) processSyncOpcode(message []byte) error {
 			binary.BigEndian.PutUint32(req[1:5], c.id)
 			binary.BigEndian.PutUint32(req[5:9], offsetId)
 			copy(req[9:], msg[0].Data())
+			c.log.Info("Send sync echo opcode")
 			c.broadcast(c.state.Peers(), message)
 		}()
 	}
