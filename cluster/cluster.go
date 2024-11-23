@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"github.com/silentiumNoxe/goripple/trans"
+	"github.com/silentiumNoxe/goripple/sm"
 	"log/slog"
 	"sync"
 	"time"
@@ -12,7 +12,9 @@ type Cluster struct {
 	id    uint32
 	peers []string
 
-	transport trans.Transport
+	out Outcome
+
+	state *sm.StateMachine
 
 	wait time.Duration
 	port string
@@ -27,17 +29,18 @@ func New(cfg *Config) *Cluster {
 		cfg.Logger = slog.Default()
 	}
 	return &Cluster{
-		id:        cfg.Id,
-		transport: cfg.Transport,
-		peers:     cfg.Peers,
-		port:      cfg.Port,
-		wg:        cfg.WaitGroup,
-		log:       cfg.Logger,
+		id:    cfg.Id,
+		out:   cfg.Out,
+		peers: cfg.Peers,
+		state: sm.New(cfg.db),
+		port:  cfg.Port,
+		wg:    cfg.WaitGroup,
+		log:   cfg.Logger,
 	}
 }
 
 func (c *Cluster) Store(message []byte) error {
-	return c.transport.Broadcast(c.peers, message)
+	c.broadcast(c.peers, message)
 	//reg, err := c.sm.Register(message)
 	//if err != nil {
 	//	return fmt.Errorf("failed register message: %w", err)
@@ -62,6 +65,19 @@ func (c *Cluster) Store(message []byte) error {
 	//	}(reg)
 	//}
 	return nil
+}
+
+func (c *Cluster) broadcast(peers []string, payload []byte) {
+	for _, peer := range peers {
+		c.wg.Add(1)
+		go func() {
+			defer c.wg.Done()
+			err := c.out(peer, payload)
+			if err != nil {
+				c.log.Warn("Failed sending message", "err", err)
+			}
+		}()
+	}
 }
 
 func (c *Cluster) Close() error {
