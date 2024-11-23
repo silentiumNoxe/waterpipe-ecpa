@@ -46,9 +46,11 @@ func (c *Cluster) processMessage(message []byte) error {
 	}
 
 	if len(msg) > 0 {
+		c.log.Info("Commit message", "offset", offsetId)
 		return c.state.Commit(offsetId)
 	}
 
+	c.log.Info("Accept message", "offset", offsetId)
 	err = c.state.Accept(offsetId, checksum)
 	if err != nil {
 		return err
