@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log/slog"
+	"math"
 	"sync"
 	"time"
 )
@@ -175,7 +176,7 @@ func (sm *StateMachine) Peers() []string {
 }
 
 func (sm *StateMachine) Quorum() int {
-	return len(sm.peers) / 2
+	return int(math.Ceil(float64(len(sm.peers) / 2)))
 }
 
 func checksum(src []byte) []byte {
