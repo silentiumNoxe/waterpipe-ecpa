@@ -14,6 +14,8 @@ type Opcode byte
 const (
 	HeathbeatOpcode = iota + 1
 	MessageOpcode
+	SyncOpcode
+	SyncEchoOpcode
 )
 
 // Cluster main structure of consensus machine
