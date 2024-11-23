@@ -60,13 +60,14 @@ func (c *Cluster) Store(message []byte) error {
 	binary.BigEndian.PutUint32(payload[5:9], msg.Id())
 	copy(payload[9:], msg.Checksum())
 
-	c.log.Info(fmt.Sprintf("Broadcast message payload=%v", payload))
 	c.broadcast(c.state.Peers(), payload)
 
 	return nil
 }
 
 func (c *Cluster) broadcast(peers []string, payload []byte) {
+	c.log.Debug(fmt.Sprintf("Broadcast message payload=%v", payload))
+
 	for _, peer := range peers {
 		c.wg.Add(1)
 		go func() {
