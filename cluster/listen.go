@@ -31,7 +31,6 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 
 	msg, err := c.state.Lookup(
 		sm.LookupCriteria{
-			States:    []sm.State{sm.PreparedState, sm.AcceptedState},
 			OffsetIds: []uint32{offsetId},
 			Checksum:  checksum,
 		},
@@ -63,11 +62,13 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 		}
 	}
 
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		c.broadcast(c.state.Peers(), message)
-	}()
+	if len(msg) == 0 {
+		c.wg.Add(1)
+		go func() {
+			defer c.wg.Done()
+			c.broadcast(c.state.Peers(), message)
+		}()
+	}
 
 	return nil
 }
