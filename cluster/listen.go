@@ -92,7 +92,7 @@ func (c *Cluster) requestPayload(offsetId uint32, checksum []byte) {
 	request[0] = SyncOpcode
 	binary.BigEndian.PutUint32(request[1:5], c.id)
 	binary.BigEndian.PutUint32(request[5:9], offsetId)
-	copy(request, checksum)
+	copy(request[9:], checksum)
 	c.log.Info("Send sync opcode")
 	c.broadcast(c.state.Peers(), request)
 }
