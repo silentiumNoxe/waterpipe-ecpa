@@ -63,7 +63,7 @@ func (c *Cluster) Store(message []byte) error {
 		payload[i+10] = b
 	}
 
-	c.log.Info(fmt.Sprintf("Broadcast message payload=%v", message))
+	c.log.Info(fmt.Sprintf("Broadcast message payload=%v", payload))
 	c.broadcast(c.peers, payload)
 
 	return nil
