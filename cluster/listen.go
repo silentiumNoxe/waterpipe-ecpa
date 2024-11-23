@@ -4,12 +4,19 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/silentiumNoxe/goripple/sm"
+	"log/slog"
 )
 
 func (c *Cluster) OnMessage(addr string, message []byte) error {
-	c.log.Info(fmt.Sprintf("Received message %v", message), "addr", addr, "length", len(message))
 	opcode := Opcode(message[0])
 	clusterId := binary.BigEndian.Uint32(message[1:5])
+	c.log.Info(
+		fmt.Sprintf("Received message"),
+		slog.String("addr", addr),
+		slog.Int("len", len(message)),
+		slog.Int("opcode", int(opcode)),
+		slog.Int("clusterId", int(clusterId)),
+	)
 	if c.id != clusterId {
 		return fmt.Errorf("invalid cluster id")
 	}
