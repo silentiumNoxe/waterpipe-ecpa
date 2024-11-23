@@ -19,7 +19,7 @@ type StateMachine struct {
 }
 
 func New(db MessageDB, peers []string, log *slog.Logger) *StateMachine {
-	return &StateMachine{db: db, m: make(map[uint32]*Message), peers: peers}
+	return &StateMachine{db: db, m: make(map[uint32]*Message), peers: peers, log: log}
 }
 
 // Prepare - initiator accept request from client and create new message
