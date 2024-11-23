@@ -10,10 +10,13 @@ import (
 func (c *Cluster) OnMessage(addr string, message []byte) error {
 	opcode := Opcode(message[0])
 	clusterId := binary.BigEndian.Uint32(message[1:5])
-	if c.id != clusterId {
-		return fmt.Errorf("invalid cluster id")
+	if c.clusterId != clusterId {
+		return fmt.Errorf("invalid cluster clusterId")
 	}
 
+	if opcode == HeathbeatOpcode {
+		return c.processHeathbeatOpcode(message[5:])
+	}
 	if opcode == MessageOpcode {
 		return c.processMessageOpcode(message[5:])
 	}
@@ -25,6 +28,13 @@ func (c *Cluster) OnMessage(addr string, message []byte) error {
 	}
 
 	return fmt.Errorf("unsupported opcode %d", opcode)
+}
+
+func (c *Cluster) processHeathbeatOpcode(message []byte) error {
+
+	c.state.AddPeer(string(message[:]))
+	//todo
+	return nil
 }
 
 func (c *Cluster) processMessageOpcode(message []byte) error {
@@ -47,7 +57,7 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 	}
 
 	if len(msg) > 1 {
-		return fmt.Errorf("found two message with one offset id %d", offsetId)
+		return fmt.Errorf("found two message with one offset clusterId %d", offsetId)
 	}
 
 	ready, err := c.state.Accept(offsetId, checksum)
@@ -72,7 +82,7 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 
 			var request = make([]byte, 41)
 			request[0] = MessageOpcode
-			binary.BigEndian.PutUint32(request[1:5], c.id)
+			binary.BigEndian.PutUint32(request[1:5], c.clusterId)
 			binary.BigEndian.PutUint32(request[5:9], offsetId)
 			copy(request[9:], checksum)
 			c.log.Info("Send message opcode echo", "offset", offsetId)
@@ -86,7 +96,7 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 func (c *Cluster) requestPayload(offsetId uint32, checksum []byte) {
 	var request = make([]byte, 41)
 	request[0] = SyncOpcode
-	binary.BigEndian.PutUint32(request[1:5], c.id)
+	binary.BigEndian.PutUint32(request[1:5], c.clusterId)
 	binary.BigEndian.PutUint32(request[5:9], offsetId)
 	copy(request[9:], checksum)
 	c.log.Info("Send sync opcode", "offset", offsetId)
@@ -117,7 +127,7 @@ func (c *Cluster) processSyncOpcode(message []byte) error {
 			defer c.wg.Done()
 			var req = make([]byte, 9+len(msg[0].Data()))
 			req[0] = SyncEchoOpcode
-			binary.BigEndian.PutUint32(req[1:5], c.id)
+			binary.BigEndian.PutUint32(req[1:5], c.clusterId)
 			binary.BigEndian.PutUint32(req[5:9], offsetId)
 			copy(req[9:], msg[0].Data())
 			c.log.Info("Send sync echo opcode", "offset", offsetId)

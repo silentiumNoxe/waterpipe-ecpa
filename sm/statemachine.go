@@ -13,14 +13,14 @@ import (
 type StateMachine struct {
 	db    MessageDB
 	m     map[uint32]*Message
-	peers []string
+	peers map[string]Peer
 
 	mux sync.RWMutex
 	log *slog.Logger
 }
 
-func New(db MessageDB, peers []string, log *slog.Logger) *StateMachine {
-	return &StateMachine{db: db, m: make(map[uint32]*Message), peers: peers, log: log}
+func New(db MessageDB, log *slog.Logger) *StateMachine {
+	return &StateMachine{db: db, m: make(map[uint32]*Message), peers: make(map[string]Peer), log: log}
 }
 
 // Prepare - initiator accept request from client and create new message
@@ -181,8 +181,26 @@ func (sm *StateMachine) Lookup(criteria LookupCriteria) ([]*Message, error) {
 	return arr, nil
 }
 
-func (sm *StateMachine) Peers() []string {
-	return sm.peers
+func (sm *StateMachine) Peers() []Peer {
+	l := len(sm.peers)
+	arr := make([]Peer, l)
+
+	i := 0
+	for _, peer := range sm.peers {
+		arr[i] = peer
+		i++
+	}
+	return arr
+}
+
+func (sm *StateMachine) AddPeer(id string, addr string) {
+	p, ok := sm.peers[id]
+	if !ok {
+		sm.peers[id] = Peer{Id: id, Addr: addr, LastHeathbeat: time.Now()}
+		return
+	}
+	p.Addr = addr
+	p.LastHeathbeat = time.Now()
 }
 
 func (sm *StateMachine) Quorum() int {

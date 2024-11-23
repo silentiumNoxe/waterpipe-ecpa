@@ -7,9 +7,12 @@ import (
 )
 
 type Config struct {
-	Id  uint32
-	Out Outcome
-	DB  sm.MessageDB
+	ClusterId uint32
+	ServerId  uint32
+	Out       Outcome
+	DB        sm.MessageDB
+
+	Addr string
 
 	Peers     []string
 	Port      string
