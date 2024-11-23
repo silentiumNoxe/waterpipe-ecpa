@@ -45,14 +45,14 @@ func (sm *StateMachine) Monitor(ctx context.Context) {
 		}
 
 		var i = 0
-		var arr = make([]*Message, sm.expStack)
+		var arr = make([]uint32, sm.expStack)
 
 		var exp = time.Now().Add(-sm.wt)
 
 		sm.mux.RLock()
 		for _, msg := range sm.m {
-			if msg.timestamp.After(exp) {
-				arr[i] = msg
+			if msg.timestamp.Before(exp) {
+				arr[i] = msg.id
 			}
 		}
 		sm.mux.RUnlock()
@@ -62,13 +62,16 @@ func (sm *StateMachine) Monitor(ctx context.Context) {
 		}
 
 		sm.mux.Lock()
-		for _, msg := range arr {
-			if msg == nil {
+		for _, offset := range arr {
+			if offset == 0 {
 				continue
 			}
 
-			sm.log.Info("[SM] Expire message", "offset", msg.id, "state", msg.state)
-			delete(sm.m, msg.id)
+			msg, ok := sm.m[offset]
+			if ok && msg.state != CommittedState {
+				sm.log.Info("[SM] Expire message", "offset", offset, "state", msg.state)
+				delete(sm.m, msg.id)
+			}
 		}
 		sm.mux.Unlock()
 	}
