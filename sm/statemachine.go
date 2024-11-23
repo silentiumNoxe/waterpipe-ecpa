@@ -30,7 +30,7 @@ func (sm *StateMachine) Prepare(message []byte) (*Message, error) {
 		return nil, err
 	}
 	offset++
-	msg := &Message{offset, message, checksum(message), PreparedState, time.Now(), 1}
+	msg := &Message{offset, message, checksum(message), PreparedState, time.Now(), 0}
 	sm.mux.Lock()
 	sm.m[offset] = msg
 	sm.mux.Unlock()
