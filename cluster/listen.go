@@ -70,11 +70,17 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 	}
 
 	if len(msg) == 0 {
-		c.log.Info("Send message opcode echo")
 		c.wg.Add(1)
 		go func() {
 			defer c.wg.Done()
-			c.broadcast(c.state.Peers(), message)
+
+			var request = make([]byte, 41)
+			request[0] = MessageOpcode
+			binary.BigEndian.PutUint32(request[1:5], c.id)
+			binary.BigEndian.PutUint32(request[5:9], offsetId)
+			copy(request, checksum)
+			c.log.Info("Send message opcode echo")
+			c.broadcast(c.state.Peers(), request)
 		}()
 	}
 
