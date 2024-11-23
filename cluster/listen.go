@@ -78,7 +78,7 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 			request[0] = MessageOpcode
 			binary.BigEndian.PutUint32(request[1:5], c.id)
 			binary.BigEndian.PutUint32(request[5:9], offsetId)
-			copy(request, checksum)
+			copy(request[9:], checksum)
 			c.log.Info("Send message opcode echo")
 			c.broadcast(c.state.Peers(), request)
 		}()
