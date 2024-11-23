@@ -23,6 +23,9 @@ type StateMachine struct {
 }
 
 func New(db MessageDB, peers []string, wt time.Duration, expStack int, log *slog.Logger) *StateMachine {
+	if expStack < 1 {
+		panic("Wrong expiration stack size, must be more then 0")
+	}
 	return &StateMachine{db: db, m: make(map[uint32]*Message), peers: peers, wt: wt, expStack: expStack, log: log}
 }
 
@@ -57,6 +60,7 @@ func (sm *StateMachine) Monitor(ctx context.Context) {
 
 		sm.mux.Lock()
 		for _, msg := range arr {
+			sm.log.Info("[SM] Expire message", "offset", msg.id, "state", msg.state)
 			delete(sm.m, msg.id)
 		}
 		sm.mux.Unlock()
