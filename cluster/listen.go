@@ -31,7 +31,7 @@ func (c *Cluster) processMessage(message []byte) error {
 
 	msg, err := c.state.Lookup(
 		sm.LookupCriteria{
-			States:    []sm.State{sm.PreparedState},
+			States:    []sm.State{sm.PreparedState, sm.AcceptedState},
 			OffsetIds: []uint32{offsetId},
 			Checksum:  checksum,
 		},
@@ -45,21 +45,28 @@ func (c *Cluster) processMessage(message []byte) error {
 		return fmt.Errorf("found two message with one offset id %d", offsetId)
 	}
 
-	if len(msg) > 0 {
-		c.log.Info("Commit message", "offset", offsetId)
-		return c.state.Commit(offsetId)
+	ready, err := c.state.Accept(offsetId, checksum)
+	if err != nil {
+		return nil
 	}
 
-	c.log.Info("Accept message", "offset", offsetId)
-	err = c.state.Accept(offsetId, checksum)
-	if err != nil {
-		return err
+	if ready {
+		if msg[0].State() == sm.PreparedState {
+			if err := c.state.Commit(offsetId); err != nil {
+				return err
+			}
+		} else if msg[0].State() == sm.AcceptedState {
+			//todo: request message payload
+			if err := c.state.Apply(offsetId, []byte("TESTTEST")); err != nil {
+				return err
+			}
+		}
 	}
 
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		c.broadcast(c.peers, message)
+		c.broadcast(c.state.Peers(), message)
 	}()
 
 	return nil

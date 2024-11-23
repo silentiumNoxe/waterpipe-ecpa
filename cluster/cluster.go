@@ -18,8 +18,7 @@ const (
 
 // Cluster main structure of consensus machine
 type Cluster struct {
-	id    uint32
-	peers []string
+	id uint32
 
 	out Outcome
 
@@ -40,8 +39,7 @@ func New(cfg *Config) *Cluster {
 	return &Cluster{
 		id:    cfg.Id,
 		out:   cfg.Out,
-		peers: cfg.Peers,
-		state: sm.New(cfg.DB),
+		state: sm.New(cfg.DB, cfg.Peers, cfg.Logger),
 		port:  cfg.Port,
 		wg:    cfg.WaitGroup,
 		log:   cfg.Logger,
@@ -61,7 +59,7 @@ func (c *Cluster) Store(message []byte) error {
 	copy(payload[9:], msg.Checksum())
 
 	c.log.Info(fmt.Sprintf("Broadcast message payload=%v", payload))
-	c.broadcast(c.peers, payload)
+	c.broadcast(c.state.Peers(), payload)
 
 	return nil
 }

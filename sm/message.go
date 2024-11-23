@@ -10,10 +10,11 @@ type Message struct {
 	checksum  []byte
 	state     State
 	timestamp time.Time
+	quorum    int
 }
 
 func NewMessage(id uint32, data []byte, checksum []byte, state State, timestamp time.Time) Message {
-	return Message{id, data, checksum, state, timestamp}
+	return Message{id, data, checksum, state, timestamp, 0}
 }
 
 func (m Message) Id() uint32 {
