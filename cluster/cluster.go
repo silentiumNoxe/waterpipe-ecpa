@@ -58,10 +58,7 @@ func (c *Cluster) Store(message []byte) error {
 	payload[0] = byte(MessageOpcode) // cmd "message"
 	binary.BigEndian.PutUint32(payload[1:5], c.id)
 	binary.BigEndian.PutUint32(payload[5:9], msg.Id())
-
-	for i, b := range msg.Checksum() {
-		payload[i+10] = b
-	}
+	copy(payload[9:], msg.Checksum())
 
 	c.log.Info(fmt.Sprintf("Broadcast message payload=%v", payload))
 	c.broadcast(c.peers, payload)

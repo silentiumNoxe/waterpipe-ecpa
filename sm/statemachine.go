@@ -82,10 +82,12 @@ func (sm *StateMachine) Commit(id uint32) error {
 
 	msg.state = CommittedState
 
-	err := sm.db.Store(msg)
+	err := sm.db.Update(id, msg)
 	if err != nil {
 		return err
 	}
+
+	delete(sm.m, id)
 
 	return nil
 }
