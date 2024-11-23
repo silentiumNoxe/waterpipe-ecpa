@@ -158,8 +158,18 @@ func (sm *StateMachine) Lookup(criteria LookupCriteria) ([]*Message, error) {
 			}
 		}
 
-		if criteria.Checksum != nil && bytes.Compare(msg.checksum, criteria.Checksum) == 0 {
-			skip = false
+		if criteria.Checksum != nil {
+			c := msg.Checksum()
+			if len(criteria.Checksum) != len(msg.Checksum()) {
+				skip = true
+			} else {
+				for i, b := range criteria.Checksum {
+					if c[i] != b {
+						skip = true
+						break
+					}
+				}
+			}
 		}
 
 		if skip == false {
