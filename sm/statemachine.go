@@ -53,7 +53,7 @@ func (sm *StateMachine) Accept(id uint32, checksum []byte) (bool, error) {
 			"quorum",
 			fmt.Sprintf("%d/%d", msg.quorum, sm.Quorum()),
 		)
-		return msg.quorum > sm.Quorum(), nil
+		return msg.quorum >= sm.Quorum(), nil
 	}
 
 	sm.log.Info("[SM] Accept message", "offset", id)
