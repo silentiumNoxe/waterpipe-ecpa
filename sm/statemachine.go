@@ -108,8 +108,8 @@ func (sm *StateMachine) Commit(id uint32) error {
 		)
 	}
 
+	sm.log.Info("[SM] Commit message", "offset", id)
 	msg.state = CommittedState
-
 	err := sm.db.Update(id, msg)
 	if err != nil {
 		return err

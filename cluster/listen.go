@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"github.com/silentiumNoxe/goripple/sm"
 	"log/slog"
@@ -79,7 +80,7 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 			binary.BigEndian.PutUint32(request[1:5], c.id)
 			binary.BigEndian.PutUint32(request[5:9], offsetId)
 			copy(request[9:], checksum)
-			c.log.Info("Send message opcode echo")
+			c.log.Info("Send message opcode echo", "offset", offsetId)
 			c.broadcast(c.state.Peers(), request)
 		}()
 	}
@@ -93,7 +94,7 @@ func (c *Cluster) requestPayload(offsetId uint32, checksum []byte) {
 	binary.BigEndian.PutUint32(request[1:5], c.id)
 	binary.BigEndian.PutUint32(request[5:9], offsetId)
 	copy(request[9:], checksum)
-	c.log.Info("Send sync opcode")
+	c.log.Info("Send sync opcode", "offset", offsetId)
 	c.broadcast(c.state.Peers(), request)
 }
 
@@ -125,9 +126,13 @@ func (c *Cluster) processSyncOpcode(message []byte) error {
 			binary.BigEndian.PutUint32(req[1:5], c.id)
 			binary.BigEndian.PutUint32(req[5:9], offsetId)
 			copy(req[9:], msg[0].Data())
-			c.log.Info("Send sync echo opcode")
+			c.log.Info("Send sync echo opcode", "offset", offsetId)
 			c.broadcast(c.state.Peers(), message)
 		}()
+	}
+
+	if len(msg) == 0 {
+		c.log.Info("Requested message not found", "offset", offsetId, "checksum", hex.EncodeToString(checksum))
 	}
 
 	return nil
