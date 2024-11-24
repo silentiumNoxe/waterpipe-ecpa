@@ -149,7 +149,7 @@ func (c *Cluster) processMessageOpcode(req *request) error {
 
 func (c *Cluster) requestPayload(offsetId uint32, checksum []byte) {
 	c.log.Info("Send sync opcode", "offset", offsetId)
-	c.broadcast(c.state.Peers(), &request{opcode: SyncOpcode, payload: checksum})
+	c.broadcast(c.state.Peers(), &request{opcode: SyncOpcode, payload: checksum, offsetId: offsetId})
 }
 
 func (c *Cluster) processSyncOpcode(req *request) error {
