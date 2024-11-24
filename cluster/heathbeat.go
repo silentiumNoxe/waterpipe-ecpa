@@ -18,7 +18,6 @@ func (c *Cluster) heathbeat(ctx context.Context) {
 	go func() {
 		defer c.wg.Done()
 		for !stop {
-			c.log.Debug("Send heathbeat opcode")
 			c.broadcast(c.state.Peers(), &request{opcode: HeathbeatOpcode, payload: []byte(c.addr)})
 			time.Sleep(time.Second * 10)
 		}

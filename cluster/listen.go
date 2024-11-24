@@ -21,7 +21,6 @@ func (r request) Length() int {
 
 func (c *Cluster) OnMessage(addr string, message []byte) error {
 	var req = parse(message)
-	c.log.Debug("Received message", "opcode", req.opcode, "replica", req.replicaId, "offset", req.offsetId)
 
 	if req.opcode == HeathbeatOpcode {
 		return c.processHeathbeatOpcode(req)
