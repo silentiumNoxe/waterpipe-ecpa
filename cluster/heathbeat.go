@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"time"
 )
 
 func (c *Cluster) heathbeat(ctx context.Context) {
@@ -19,6 +20,7 @@ func (c *Cluster) heathbeat(ctx context.Context) {
 		for !stop {
 			c.log.Debug("Send heathbeat opcode")
 			c.broadcast(c.state.Peers(), &request{opcode: HeathbeatOpcode, payload: []byte(c.addr)})
+			time.Sleep(time.Second * 10)
 		}
 	}()
 }
