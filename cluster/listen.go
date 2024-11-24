@@ -59,6 +59,8 @@ func (c *Cluster) processHeathbeatOpcode(req *request) error {
 
 	isNew := c.state.AddPeer(req.replicaId, addr)
 	if isNew {
+		c.log.Info("Registered new peer", "replica", req.replicaId)
+
 		peers := c.state.Peers()
 		p := make([]sm.Peer, 0, len(peers))
 		for _, peer := range peers {
@@ -88,7 +90,10 @@ func (c *Cluster) processNewReplicaOpcode(req *request) error {
 		return fmt.Errorf("no address of replica")
 	}
 
-	c.state.AddPeer(replicaId, addr)
+	isNew := c.state.AddPeer(replicaId, addr)
+	if isNew {
+		c.log.Info("Registered new replica", "replica", replicaId)
+	}
 	return nil
 }
 
