@@ -107,7 +107,6 @@ func (c *Cluster) processMessageOpcode(req *request) error {
 	msg, err := c.state.Lookup(
 		sm.LookupCriteria{
 			OffsetIds: []uint32{req.offsetId},
-			Checksum:  checksum,
 		},
 	)
 
