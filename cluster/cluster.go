@@ -81,8 +81,6 @@ func (c *Cluster) broadcast(peers []sm.Peer, req *request) {
 	binary.BigEndian.PutUint32(message[6:10], req.offsetId)
 	copy(message[10:], req.payload)
 
-	c.log.Debug(fmt.Sprintf("Broadcast message payload=%v", message))
-
 	for _, peer := range peers {
 		c.wg.Add(1)
 		go func(addr string, payload []byte) {
