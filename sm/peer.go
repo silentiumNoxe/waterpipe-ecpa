@@ -5,7 +5,7 @@ import (
 )
 
 type Peer struct {
-	Id            string
+	Id            uint32
 	Addr          string
 	LastHeathbeat time.Time
 }

@@ -7,39 +7,57 @@ import (
 	"github.com/silentiumNoxe/goripple/sm"
 )
 
-func (c *Cluster) OnMessage(addr string, message []byte) error {
-	opcode := Opcode(message[0])
-	clusterId := binary.BigEndian.Uint32(message[1:5])
-	if c.clusterId != clusterId {
-		return fmt.Errorf("invalid cluster clusterId")
-	}
-
-	if opcode == HeathbeatOpcode {
-		return c.processHeathbeatOpcode(message[5:])
-	}
-	if opcode == MessageOpcode {
-		return c.processMessageOpcode(message[5:])
-	}
-	if opcode == SyncOpcode {
-		return c.processSyncOpcode(message[5:])
-	}
-	if opcode == SyncEchoOpcode {
-		return c.processSyncEchoOpcode(message[5:])
-	}
-
-	return fmt.Errorf("unsupported opcode %d", opcode)
+type request struct {
+	opcode    Opcode
+	clusterId byte
+	replicaId uint32
+	offsetId  uint32
+	payload   []byte
 }
 
-func (c *Cluster) processHeathbeatOpcode(message []byte) error {
+func (r request) Length() int {
+	return len(r.payload) + 10 // 1 + 1 + 4 + 4
+}
 
-	c.state.AddPeer(string(message[:]))
-	//todo
+func (c *Cluster) OnMessage(addr string, message []byte) error {
+	var req = parse(message)
+
+	if req.opcode == HeathbeatOpcode {
+		return c.processHeathbeatOpcode(req)
+	}
+	if req.opcode == MessageOpcode {
+		return c.processMessageOpcode(req)
+	}
+	if req.opcode == SyncOpcode {
+		return c.processSyncOpcode(req)
+	}
+	if req.opcode == SyncEchoOpcode {
+		return c.processSyncEchoOpcode(req)
+	}
+
+	return fmt.Errorf("unsupported opcode %d", req.opcode)
+}
+
+func parse(message []byte) *request {
+	var r = request{}
+	r.opcode = Opcode(message[0])
+	r.clusterId = message[1]
+	r.replicaId = binary.BigEndian.Uint32(message[2:6])
+	r.offsetId = binary.BigEndian.Uint32(message[6:10])
+	r.payload = message[10:]
+	return &r
+}
+
+func (c *Cluster) processHeathbeatOpcode(req *request) error {
+	if len(req.payload) == 0 {
+		return fmt.Errorf("no address of replica")
+	}
+	c.state.AddPeer(req.replicaId, string(req.payload))
 	return nil
 }
 
-func (c *Cluster) processMessageOpcode(message []byte) error {
-	offsetId := binary.BigEndian.Uint32(message[0:4])
-	checksum := message[4:]
+func (c *Cluster) processMessageOpcode(req *request) error {
+	checksum := req.payload
 
 	if len(checksum) < 32 {
 		return fmt.Errorf("wrong checksum size (%d)", len(checksum))
@@ -47,7 +65,7 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 
 	msg, err := c.state.Lookup(
 		sm.LookupCriteria{
-			OffsetIds: []uint32{offsetId},
+			OffsetIds: []uint32{req.offsetId},
 			Checksum:  checksum,
 		},
 	)
@@ -57,21 +75,21 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 	}
 
 	if len(msg) > 1 {
-		return fmt.Errorf("found two message with one offset clusterId %d", offsetId)
+		return fmt.Errorf("found two message with one offset clusterId %d", req.offsetId)
 	}
 
-	ready, err := c.state.Accept(offsetId, checksum)
+	ready, err := c.state.Accept(req.offsetId, checksum)
 	if err != nil {
 		return nil
 	}
 
 	if ready {
 		if msg[0].State() == sm.PreparedState {
-			if err := c.state.Apply(offsetId, msg[0].Data()); err != nil {
+			if err := c.state.Apply(req.offsetId, msg[0].Data()); err != nil {
 				return err
 			}
 		} else if msg[0].State() == sm.AcceptedState {
-			c.requestPayload(offsetId, msg[0].Checksum())
+			c.requestPayload(req.offsetId, msg[0].Checksum())
 		}
 	}
 
@@ -79,14 +97,8 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 		c.wg.Add(1)
 		go func() {
 			defer c.wg.Done()
-
-			var request = make([]byte, 41)
-			request[0] = MessageOpcode
-			binary.BigEndian.PutUint32(request[1:5], c.clusterId)
-			binary.BigEndian.PutUint32(request[5:9], offsetId)
-			copy(request[9:], checksum)
-			c.log.Info("Send message opcode echo", "offset", offsetId)
-			c.broadcast(c.state.Peers(), request)
+			c.log.Info("Send message opcode echo", "offset", req.offsetId)
+			c.broadcast(c.state.Peers(), req)
 		}()
 	}
 
@@ -94,18 +106,12 @@ func (c *Cluster) processMessageOpcode(message []byte) error {
 }
 
 func (c *Cluster) requestPayload(offsetId uint32, checksum []byte) {
-	var request = make([]byte, 41)
-	request[0] = SyncOpcode
-	binary.BigEndian.PutUint32(request[1:5], c.clusterId)
-	binary.BigEndian.PutUint32(request[5:9], offsetId)
-	copy(request[9:], checksum)
 	c.log.Info("Send sync opcode", "offset", offsetId)
-	c.broadcast(c.state.Peers(), request)
+	c.broadcast(c.state.Peers(), &request{opcode: SyncOpcode, payload: checksum})
 }
 
-func (c *Cluster) processSyncOpcode(message []byte) error {
-	offsetId := binary.BigEndian.Uint32(message[0:4])
-	checksum := message[4:]
+func (c *Cluster) processSyncOpcode(req *request) error {
+	checksum := req.payload
 
 	if len(checksum) < 32 {
 		return fmt.Errorf("wrong checksum size (%d)", len(checksum))
@@ -113,7 +119,7 @@ func (c *Cluster) processSyncOpcode(message []byte) error {
 
 	msg, err := c.state.Lookup(
 		sm.LookupCriteria{
-			OffsetIds: []uint32{offsetId},
+			OffsetIds: []uint32{req.offsetId},
 			Checksum:  checksum,
 		},
 	)
@@ -125,30 +131,27 @@ func (c *Cluster) processSyncOpcode(message []byte) error {
 		c.wg.Add(1)
 		go func() {
 			defer c.wg.Done()
-			var req = make([]byte, 9+len(msg[0].Data()))
-			req[0] = SyncEchoOpcode
-			binary.BigEndian.PutUint32(req[1:5], c.clusterId)
-			binary.BigEndian.PutUint32(req[5:9], offsetId)
-			copy(req[9:], msg[0].Data())
-			c.log.Info("Send sync echo opcode", "offset", offsetId)
-			c.broadcast(c.state.Peers(), req)
+			c.log.Info("Send sync echo opcode", "offset", req.offsetId)
+			c.broadcast(
+				c.state.Peers(),
+				&request{opcode: SyncEchoOpcode, offsetId: req.offsetId, payload: msg[0].Data()},
+			)
 		}()
 	}
 
 	if len(msg) == 0 {
-		c.log.Info("Requested message not found", "offset", offsetId, "checksum", hex.EncodeToString(checksum))
+		c.log.Info("Requested message not found", "offset", req.offsetId, "checksum", hex.EncodeToString(checksum))
 	}
 
 	return nil
 }
 
-func (c *Cluster) processSyncEchoOpcode(message []byte) error {
-	offsetId := binary.BigEndian.Uint32(message[0:4])
-	data := message[4:]
+func (c *Cluster) processSyncEchoOpcode(req *request) error {
+	data := req.payload
 
 	msg, err := c.state.Lookup(
 		sm.LookupCriteria{
-			OffsetIds: []uint32{offsetId},
+			OffsetIds: []uint32{req.offsetId},
 		},
 	)
 
@@ -161,8 +164,8 @@ func (c *Cluster) processSyncEchoOpcode(message []byte) error {
 	}
 
 	if msg[0].State() == sm.AcceptedState {
-		c.log.Info("Apply message", "offset", offsetId)
-		return c.state.Apply(offsetId, data)
+		c.log.Info("Apply message", "offset", req.offsetId)
+		return c.state.Apply(req.offsetId, data)
 	}
 
 	return nil

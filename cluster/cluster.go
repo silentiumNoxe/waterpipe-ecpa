@@ -20,10 +20,9 @@ const (
 
 // Cluster main structure of consensus machine
 type Cluster struct {
-	clusterId uint32
-	serverId  uint32
-
-	Addr string
+	clusterId byte
+	replicaId uint32
+	addr      string
 
 	out Outcome
 
@@ -45,8 +44,8 @@ func New(cfg *Config) *Cluster {
 
 	return &Cluster{
 		clusterId: cfg.ClusterId,
-		serverId:  cfg.ServerId,
-		Addr:      cfg.Addr,
+		replicaId: cfg.ReplicaId,
+		addr:      cfg.Addr,
 		out:       cfg.Out,
 		state:     s,
 		port:      cfg.Port,
@@ -61,33 +60,31 @@ func (c *Cluster) Store(message []byte) error {
 		return err
 	}
 
-	payload := make([]byte, 36)
-	binary.BigEndian.PutUint32(payload[0:5], msg.Id())
-	copy(payload[9:], msg.Checksum())
-
-	c.broadcast(c.state.Peers(), MessageOpcode, payload)
+	c.broadcast(c.state.Peers(), &request{opcode: MessageOpcode, offsetId: msg.Id(), payload: msg.Checksum()})
 
 	return nil
 }
 
-func (c *Cluster) broadcast(peers []sm.Peer, opcode Opcode, payload []byte) {
-	c.log.Debug(fmt.Sprintf("Broadcast message payload=%v", payload))
+func (c *Cluster) broadcast(peers []sm.Peer, req *request) {
+	var message = make([]byte, req.Length())
+	message[0] = byte(req.opcode)
+	message[1] = c.clusterId
+	binary.BigEndian.PutUint32(message[2:6], c.replicaId)
+	binary.BigEndian.PutUint32(message[6:10], req.offsetId)
+	copy(message[10:], req.payload)
+
+	c.log.Debug(fmt.Sprintf("Broadcast message payload=%v", message))
 
 	for _, peer := range peers {
 		c.wg.Add(1)
 		go func(addr string, payload []byte) {
 			defer c.wg.Done()
 
-			var req = make([]byte, len(payload)+5)
-			req[0] = byte(opcode)
-			binary.BigEndian.PutUint32(req[1:5], c.clusterId)
-			copy(req[5:], payload)
-
 			err := c.out(addr, payload)
 			if err != nil {
 				c.log.Warn("Failed sending message", "err", err)
 			}
-		}(peer.Addr, payload)
+		}(peer.Addr, message[:]) //todo: slice or array?
 	}
 }
 

@@ -7,8 +7,8 @@ import (
 )
 
 type Config struct {
-	ClusterId uint32
-	ServerId  uint32
+	ClusterId byte
+	ReplicaId uint32
 	Out       Outcome
 	DB        sm.MessageDB
 
