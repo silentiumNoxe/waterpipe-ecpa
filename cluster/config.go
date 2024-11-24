@@ -14,7 +14,7 @@ type Config struct {
 
 	Addr string
 
-	Peers     []string
+	Peers     map[uint32]string
 	Port      string
 	WaitGroup *sync.WaitGroup
 	Logger    *slog.Logger

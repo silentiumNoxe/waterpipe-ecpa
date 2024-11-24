@@ -42,6 +42,9 @@ func New(cfg *Config) *Cluster {
 		cfg.Logger = slog.Default()
 	}
 	s := sm.New(cfg.DB, cfg.Logger)
+	for id, addr := range cfg.Peers {
+		s.AddPeer(id, addr)
+	}
 
 	return &Cluster{
 		clusterId: cfg.ClusterId,
