@@ -197,17 +197,19 @@ func (sm *StateMachine) Peers() []Peer {
 	return arr
 }
 
-func (sm *StateMachine) AddPeer(id uint32, addr string) {
+// AddPeer returns boolean value that describes is a peer new
+func (sm *StateMachine) AddPeer(id uint32, addr string) bool {
 	sm.peerMux.Lock()
 	defer sm.peerMux.Unlock()
 
 	p, ok := sm.peers[id]
 	if !ok {
 		sm.peers[id] = Peer{Id: id, Addr: addr, LastHeathbeat: time.Now()}
-		return
+		return true
 	}
 	p.Addr = addr
 	p.LastHeathbeat = time.Now()
+	return false
 }
 
 func (sm *StateMachine) Quorum() int {

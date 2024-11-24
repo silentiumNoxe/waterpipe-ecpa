@@ -13,6 +13,7 @@ type Opcode byte
 
 const (
 	HeathbeatOpcode = iota + 1
+	NewReplicaOpcode
 	MessageOpcode
 	SyncOpcode
 	SyncEchoOpcode

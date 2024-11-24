@@ -25,6 +25,9 @@ func (c *Cluster) OnMessage(addr string, message []byte) error {
 	if req.opcode == HeathbeatOpcode {
 		return c.processHeathbeatOpcode(req)
 	}
+	if req.opcode == NewReplicaOpcode {
+		return c.processNewReplicaOpcode(req)
+	}
 	if req.opcode == MessageOpcode {
 		return c.processMessageOpcode(req)
 	}
@@ -49,10 +52,43 @@ func parse(message []byte) *request {
 }
 
 func (c *Cluster) processHeathbeatOpcode(req *request) error {
-	if len(req.payload) == 0 {
+	addr := string(req.payload)
+	if addr == "" {
 		return fmt.Errorf("no address of replica")
 	}
-	c.state.AddPeer(req.replicaId, string(req.payload))
+
+	isNew := c.state.AddPeer(req.replicaId, addr)
+	if isNew {
+		peers := c.state.Peers()
+		p := make([]sm.Peer, 0, len(peers))
+		for _, peer := range peers {
+			if peer.Id != req.replicaId {
+				p = append(p, peer)
+			}
+		}
+		var body = make([]byte, len(addr)+4)
+		binary.BigEndian.PutUint32(body[:4], req.replicaId)
+		copy(body[4:], addr)
+		c.log.Info("Send new replica opcode")
+		c.broadcast(p, &request{opcode: NewReplicaOpcode, payload: body})
+	}
+	return nil
+}
+
+func (c *Cluster) processNewReplicaOpcode(req *request) error {
+	message := req.payload
+	replicaId := binary.BigEndian.Uint32(message[:4])
+	addr := string(message[4:])
+
+	if replicaId == 0 {
+		return fmt.Errorf("no replica id")
+	}
+
+	if addr == "" {
+		return fmt.Errorf("no address of replica")
+	}
+
+	c.state.AddPeer(replicaId, addr)
 	return nil
 }
 
