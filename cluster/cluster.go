@@ -61,7 +61,11 @@ func (c *Cluster) Store(message []byte) error {
 		return err
 	}
 
-	c.broadcast(c.state.Peers(), &request{opcode: MessageOpcode, offsetId: msg.Id(), payload: msg.Checksum()})
+	peers := c.state.Peers()
+	if len(peers) == 0 {
+		return fmt.Errorf("cluster not ready yet, no peers")
+	}
+	c.broadcast(peers, &request{opcode: MessageOpcode, offsetId: msg.Id(), payload: msg.Checksum()})
 
 	return nil
 }
