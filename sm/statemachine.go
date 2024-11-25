@@ -14,12 +14,14 @@ import (
 type StateMachine struct {
 	db    MessageDB
 	m     map[uint32]*Message
-	peers []string
+	peers map[uint32]Peer
 
 	wt       time.Duration
 	expStack int
-	mux      sync.RWMutex
 	log      *slog.Logger
+	mux     sync.RWMutex
+	peerMux sync.RWMutex
+	log     *slog.Logger
 }
 
 func New(db MessageDB, peers []string, wt time.Duration, expStack int, log *slog.Logger) *StateMachine {
@@ -29,7 +31,7 @@ func New(db MessageDB, peers []string, wt time.Duration, expStack int, log *slog
 	if log == nil {
 		log = slog.Default()
 	}
-	return &StateMachine{db: db, m: make(map[uint32]*Message), peers: peers, wt: wt, expStack: expStack, log: log}
+	return &StateMachine{db: db, m: make(map[uint32]*Message), peers: make(map[uint32]Peer), wt: wt, expStack: expStack, log: log}
 }
 
 func (sm *StateMachine) Monitor(ctx context.Context) {
@@ -235,8 +237,34 @@ func (sm *StateMachine) Lookup(criteria LookupCriteria) ([]*Message, error) {
 	return arr, nil
 }
 
-func (sm *StateMachine) Peers() []string {
-	return sm.peers
+func (sm *StateMachine) Peers() []Peer {
+	sm.peerMux.RLock()
+	defer sm.peerMux.RUnlock()
+
+	l := len(sm.peers)
+	arr := make([]Peer, l)
+
+	i := 0
+	for _, peer := range sm.peers {
+		arr[i] = peer
+		i++
+	}
+	return arr
+}
+
+// AddPeer returns boolean value that describes is a peer new
+func (sm *StateMachine) AddPeer(id uint32, addr string) bool {
+	sm.peerMux.Lock()
+	defer sm.peerMux.Unlock()
+
+	p, ok := sm.peers[id]
+	if !ok {
+		sm.peers[id] = Peer{Id: id, Addr: addr, LastHeathbeat: time.Now()}
+		return true
+	}
+	p.Addr = addr
+	p.LastHeathbeat = time.Now()
+	return false
 }
 
 func (sm *StateMachine) Quorum() int {

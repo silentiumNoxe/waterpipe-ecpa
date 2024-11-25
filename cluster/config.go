@@ -8,12 +8,15 @@ import (
 )
 
 type Config struct {
-	Id          uint32
-	Out         Outcome
-	DB          sm.MessageDB
+	ClusterId byte
+	ReplicaId uint32
+	Out       Outcome
+	DB        sm.MessageDB
 	WaitTimeout time.Duration
 
-	Peers     []string
+	Addr string
+
+	Peers     map[uint32]string
 	Port      string
 	WaitGroup *sync.WaitGroup
 	Logger    *slog.Logger
