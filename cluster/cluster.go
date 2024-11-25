@@ -3,7 +3,7 @@ package cluster
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/silentiumNoxe/goripple/sm"
+	"github.com/silentiumNoxe/waterpipe-ecpa/sm"
 	"log/slog"
 	"sync"
 	"time"

@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"github.com/silentiumNoxe/goripple/sm"
+	"github.com/silentiumNoxe/waterpipe-ecpa/sm"
 	"log/slog"
 	"sync"
 )
