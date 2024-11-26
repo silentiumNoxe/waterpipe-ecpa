@@ -18,10 +18,23 @@ type StateMachine struct {
 	mux     sync.RWMutex
 	peerMux sync.RWMutex
 	log     *slog.Logger
+
+	statePubSub map[State]*PubSub[*Message]
 }
 
 func New(db MessageDB, log *slog.Logger) *StateMachine {
-	return &StateMachine{db: db, m: make(map[uint32]*Message), peers: make(map[uint32]Peer), log: log}
+	var pubsub = make(map[State]*PubSub[*Message])
+	pubsub[PreparedState] = &PubSub[*Message]{}
+	pubsub[AcceptedState] = &PubSub[*Message]{}
+	pubsub[CommittedState] = &PubSub[*Message]{}
+
+	return &StateMachine{
+		db:          db,
+		m:           make(map[uint32]*Message),
+		peers:       make(map[uint32]Peer),
+		log:         log,
+		statePubSub: pubsub,
+	}
 }
 
 // Prepare - initiator accept request from client and create new message
@@ -35,6 +48,9 @@ func (sm *StateMachine) Prepare(message []byte) (*Message, error) {
 	sm.mux.Lock()
 	sm.m[offset] = msg
 	sm.mux.Unlock()
+
+	sm.statePubSub[PreparedState].AsyncPub(msg)
+
 	return msg, nil
 }
 
@@ -54,6 +70,9 @@ func (sm *StateMachine) Accept(id uint32, checksum []byte) (bool, error) {
 			"quorum",
 			fmt.Sprintf("%d/%d", msg.quorum, sm.Quorum()),
 		)
+
+		sm.statePubSub[AcceptedState].AsyncPub(msg)
+
 		return msg.quorum >= sm.Quorum(), nil
 	}
 
@@ -61,6 +80,9 @@ func (sm *StateMachine) Accept(id uint32, checksum []byte) (bool, error) {
 	sm.mux.Lock()
 	sm.m[id] = &Message{id, nil, checksum, AcceptedState, time.Now(), 1}
 	sm.mux.Unlock()
+
+	sm.statePubSub[AcceptedState].AsyncPub(msg)
+
 	return false, nil
 }
 
@@ -117,6 +139,8 @@ func (sm *StateMachine) Commit(id uint32) error {
 	}
 
 	delete(sm.m, id)
+
+	sm.statePubSub[CommittedState].AsyncPub(msg)
 
 	return nil
 }
@@ -214,6 +238,16 @@ func (sm *StateMachine) AddPeer(id uint32, addr string) bool {
 
 func (sm *StateMachine) Quorum() int {
 	return int(math.Ceil(float64(len(sm.peers)+1) / float64(2)))
+}
+
+func (sm *StateMachine) Subscribe(state State, sub func(*Message)) error {
+	x := sm.statePubSub[state]
+	if x == nil {
+		return fmt.Errorf("unsupported message state %d", state)
+	}
+
+	x.Sub(sub)
+	return nil
 }
 
 func checksum(src []byte) []byte {

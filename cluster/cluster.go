@@ -73,6 +73,20 @@ func (c *Cluster) Store(message []byte) error {
 	return nil
 }
 
+func (c *Cluster) AsyncPropose(message []byte) (<-chan bool, error) {
+	msg, err := c.state.Prepare(message)
+	if err != nil {
+		return nil, err
+	}
+
+	p := c.state.Peers()
+	if len(p) == 0 {
+		return nil, fmt.Errorf("cluster not ready yet, no peers")
+	}
+
+	c.broadcast(p, &request{opcode: MessageOpcode, offsetId: msg.Id(), payload: msg.Checksum()})
+}
+
 func (c *Cluster) broadcast(peers []sm.Peer, req *request) {
 	var message = make([]byte, req.Length())
 	message[0] = byte(req.opcode)
@@ -82,15 +96,10 @@ func (c *Cluster) broadcast(peers []sm.Peer, req *request) {
 	copy(message[10:], req.payload)
 
 	for _, peer := range peers {
-		c.wg.Add(1)
-		go func(addr string, payload []byte) {
-			defer c.wg.Done()
-
-			err := c.out(addr, payload)
-			if err != nil {
-				c.log.Warn("Failed sending message", "err", err)
-			}
-		}(peer.Addr, message[:]) //todo: slice or array?
+		err := c.out(peer.Addr, message)
+		if err != nil {
+			c.log.Warn("Failed sending message", "err", err)
+		}
 	}
 }
 
