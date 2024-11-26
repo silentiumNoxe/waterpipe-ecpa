@@ -19,26 +19,41 @@ func (r request) Length() int {
 	return len(r.payload) + 10 // 1 + 1 + 4 + 4
 }
 
-func (c *Cluster) OnMessage(addr string, message []byte) error {
+func (c *Cluster) OnMessage(message []byte) {
 	var req = parse(message)
 
 	if req.opcode == HeathbeatOpcode {
-		return c.processHeathbeatOpcode(req)
+		if err := c.processHeathbeatOpcode(req); err != nil {
+			c.log.Warn("Fail process message", "err", err)
+		}
+		return
 	}
 	if req.opcode == NewReplicaOpcode {
-		return c.processNewReplicaOpcode(req)
+		if err := c.processNewReplicaOpcode(req); err != nil {
+			c.log.Warn("Fail process message", "err", err)
+		}
+		return
 	}
 	if req.opcode == MessageOpcode {
-		return c.processMessageOpcode(req)
+		if err := c.processMessageOpcode(req); err != nil {
+			c.log.Warn("Fail process message", "err", err)
+		}
+		return
 	}
 	if req.opcode == SyncOpcode {
-		return c.processSyncOpcode(req)
+		if err := c.processSyncOpcode(req); err != nil {
+			c.log.Warn("Fail process message", "err", err)
+		}
+		return
 	}
 	if req.opcode == SyncEchoOpcode {
-		return c.processSyncEchoOpcode(req)
+		if err := c.processSyncEchoOpcode(req); err != nil {
+			c.log.Warn("Fail process message", "err", err)
+		}
+		return
 	}
 
-	return fmt.Errorf("unsupported opcode %d", req.opcode)
+	c.log.Info(fmt.Sprintf("Unsupported opcode %d", req.opcode))
 }
 
 func parse(message []byte) *request {

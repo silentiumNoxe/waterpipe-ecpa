@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/silentiumNoxe/waterpipe-ecpa/sm"
 	"log/slog"
+	"net"
 	"sync"
 	"time"
 )
@@ -23,7 +24,7 @@ const (
 type Cluster struct {
 	clusterId byte
 	replicaId uint32
-	addr      string
+	addr      *net.UDPAddr
 
 	out Outcome
 
@@ -83,10 +84,11 @@ func (c *Cluster) broadcast(peers []sm.Peer, req *request) {
 
 	for _, peer := range peers {
 		c.wg.Add(1)
+
 		go func(addr string, payload []byte) {
 			defer c.wg.Done()
 
-			err := c.out(addr, payload)
+			err := publish(c.addr, addr, payload)
 			if err != nil {
 				c.log.Warn("Failed sending message", "err", err)
 			}

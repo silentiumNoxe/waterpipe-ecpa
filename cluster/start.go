@@ -5,5 +5,23 @@ import (
 )
 
 func (c *Cluster) Run(ctx context.Context) {
-	c.heathbeat(ctx)
+	stop := make(chan struct{})
+
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		<-ctx.Done()
+		close(stop)
+	}()
+
+	go func() {
+		err := listen(c.wg, c.log, stop, c.addr, c.OnMessage)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	go func() {
+		c.heathbeat(stop)
+	}()
 }
