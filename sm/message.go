@@ -57,7 +57,7 @@ func (m Message) String() string {
 type State byte
 
 const (
-	PreparedState = iota + 1
+	PreparedState State = iota + 1
 	AcceptedState
 	CommittedState
 )
