@@ -43,7 +43,7 @@ func listen(
 		}
 
 		if n <= len(content) {
-			onmessage(content)
+			onmessage(content[:n])
 			continue
 		}
 
