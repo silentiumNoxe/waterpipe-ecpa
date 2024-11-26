@@ -1,6 +1,9 @@
 package cluster
 
 import (
+	"bytes"
+	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"sync"
@@ -42,12 +45,29 @@ func listen(
 			continue
 		}
 
-		if n <= len(content) {
+		if n < len(content) {
 			onmessage(content[:n])
 			continue
 		}
 
-		log.Info("payload is more than 1024 bytes")
+		var buff bytes.Buffer
+		buff.Write(content)
+		for {
+			content = make([]byte, 1024)
+			n, err = socket.Read(content)
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					log.Warn("Failed read payload")
+					break
+				}
+			}
+
+			buff.Write(content)
+			if n < len(content) {
+				onmessage(buff.Bytes())
+				break
+			}
+		}
 	}
 
 	return nil

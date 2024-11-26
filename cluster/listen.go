@@ -36,19 +36,19 @@ func (c *Cluster) OnMessage(message []byte) {
 	}
 	if req.opcode == MessageOpcode {
 		if err := c.processMessageOpcode(req); err != nil {
-			c.log.Warn("Fail process message", "err", err)
+			c.log.Warn("Fail process message", "err", err, "opcode", req.opcode, "offset", req.offsetId)
 		}
 		return
 	}
 	if req.opcode == SyncOpcode {
 		if err := c.processSyncOpcode(req); err != nil {
-			c.log.Warn("Fail process message", "err", err)
+			c.log.Warn("Fail process message", "err", err, "opcode", req.opcode, "offset", req.offsetId)
 		}
 		return
 	}
 	if req.opcode == SyncEchoOpcode {
 		if err := c.processSyncEchoOpcode(req); err != nil {
-			c.log.Warn("Fail process message", "err", err)
+			c.log.Warn("Fail process message", "err", err, "opcode", req.opcode, "offset", req.offsetId)
 		}
 		return
 	}
@@ -126,7 +126,7 @@ func (c *Cluster) processMessageOpcode(req *request) error {
 	)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to lookup message: %w", err)
 	}
 
 	if len(msg) > 1 {
@@ -135,13 +135,13 @@ func (c *Cluster) processMessageOpcode(req *request) error {
 
 	ready, err := c.state.Accept(req.offsetId, checksum)
 	if err != nil {
-		return nil
+		return fmt.Errorf("unable to accept message: %w", err)
 	}
 
 	if ready {
 		if msg[0].State() == sm.PreparedState {
 			if err := c.state.Apply(req.offsetId, msg[0].Data()); err != nil {
-				return err
+				return fmt.Errorf("unable to apply message: %w", err)
 			}
 		} else if msg[0].State() == sm.AcceptedState {
 			c.requestPayload(req.offsetId, msg[0].Checksum())
