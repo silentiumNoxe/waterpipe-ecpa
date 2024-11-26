@@ -18,4 +18,6 @@ type Config struct {
 	Port      string
 	WaitGroup *sync.WaitGroup
 	Logger    *slog.Logger
+
+	Secret string
 }
