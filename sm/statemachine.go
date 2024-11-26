@@ -221,3 +221,7 @@ func checksum(src []byte) []byte {
 	h.Write(src)
 	return h.Sum(nil)
 }
+
+func Checksum(src []byte) []byte {
+	return checksum(src)
+}
