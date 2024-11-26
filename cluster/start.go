@@ -15,6 +15,7 @@ func (c *Cluster) Run(ctx context.Context) {
 	}()
 
 	go func() {
+		c.log.Info("Start UDP server", "port", c.addr.Port)
 		err := listen(c.wg, c.log, stop, c.addr, c.OnMessage)
 		if err != nil {
 			panic(err)

@@ -88,7 +88,7 @@ func (c *Cluster) broadcast(peers []sm.Peer, req *request) {
 		go func(addr string, payload []byte) {
 			defer c.wg.Done()
 
-			err := publish(c.addr, addr, payload)
+			err := publish(addr, payload)
 			if err != nil {
 				c.log.Warn("Failed sending message", "err", err)
 			}

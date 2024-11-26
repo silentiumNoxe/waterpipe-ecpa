@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func publish(laddr *net.UDPAddr, target string, payload []byte) error {
+func publish(target string, payload []byte) error {
 	s := strings.Split(target, ":")
 	domain := s[0]
 	port := s[1]
@@ -33,7 +33,7 @@ func publish(laddr *net.UDPAddr, target string, payload []byte) error {
 		raddr.Port = p
 	}
 
-	conn, err := net.DialUDP("udp", laddr, raddr)
+	conn, err := net.DialUDP("udp", nil, raddr)
 	if err != nil {
 		return err
 	}
