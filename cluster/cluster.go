@@ -93,7 +93,7 @@ func (c *Cluster) Store(message []byte) error {
 }
 
 func (c *Cluster) broadcast(peers []sm.Peer, req *request, otp uint32) {
-	var message = make([]byte, req.Length())
+	var message = make([]byte, req.Length()+1+1+4+4+4)
 	message[0] = byte(req.opcode)
 	message[1] = c.clusterId
 	binary.BigEndian.PutUint32(message[2:6], otp)

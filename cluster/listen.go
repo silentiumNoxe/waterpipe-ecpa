@@ -17,7 +17,7 @@ type request struct {
 }
 
 func (r request) Length() int {
-	return len(r.payload) + 10 // 1 + 1 + 4 + 4
+	return len(r.payload)
 }
 
 func (c *Cluster) OnMessage(message []byte) {
