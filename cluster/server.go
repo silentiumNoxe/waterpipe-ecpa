@@ -53,7 +53,7 @@ func listen(
 		var buff bytes.Buffer
 		buff.Write(content)
 		for {
-			content = make([]byte, 1024)
+			content = make([]byte, 512)
 			n, err = socket.Read(content)
 			if err != nil {
 				if !errors.Is(err, io.EOF) {

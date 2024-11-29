@@ -107,19 +107,26 @@ func (c *Cluster) broadcast(peers []sm.Peer, req *request, otp uint32) {
 	const headerSize = 64
 	const payloadSize = maxSize - headerSize
 
-	var segments = make([][]byte, 0)
+	var segmentsCount uint32 = 1
 
-	var id = time.Now().UnixMilli()
+	if len(req.payload) > payloadSize {
+		segmentsCount = uint32(math.Ceil(float64(len(req.payload)) / float64(payloadSize)))
+	}
+
+	var segments = make([][]byte, 0, segmentsCount)
+
 	var r = bytes.NewReader(req.payload)
+	var id = time.Now().UnixMilli()
 
 	for i := 0; true; i++ {
-		var meta = make([]byte, 64)
-		meta[0] = byte(req.opcode)
-		meta[1] = c.clusterId
-		binary.BigEndian.PutUint32(meta[2:6], otp)
-		binary.BigEndian.PutUint32(meta[6:10], c.replicaId)
-		binary.BigEndian.PutUint64(meta[10:18], uint64(id))
-		binary.BigEndian.PutUint32(meta[18:22], uint32(i))
+		var meta = bytes.NewBuffer(make([]byte, 64))
+		meta.WriteByte(byte(req.opcode))
+		meta.WriteByte(c.clusterId)
+		_ = binary.Write(meta, binary.BigEndian, otp)
+		_ = binary.Write(meta, binary.BigEndian, c.replicaId)
+		_ = binary.Write(meta, binary.BigEndian, uint64(id))
+		_ = binary.Write(meta, binary.BigEndian, uint32(i))
+		_ = binary.Write(meta, binary.BigEndian, segmentsCount)
 
 		var data = make([]byte, payloadSize)
 		n, err := r.Read(data)
@@ -133,7 +140,7 @@ func (c *Cluster) broadcast(peers []sm.Peer, req *request, otp uint32) {
 		}
 
 		var msg = make([]byte, maxSize)
-		copy(msg[:headerSize], meta)
+		copy(msg[:headerSize], meta.Bytes())
 		copy(msg[headerSize:], data)
 
 		segments = append(segments, msg)
