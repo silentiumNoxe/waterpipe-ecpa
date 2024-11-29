@@ -64,7 +64,9 @@ func listen(
 
 			buff.Write(content)
 			if n < len(content) {
-				onmessage(buff.Bytes())
+				go func() {
+					onmessage(buff.Bytes())
+				}()
 				break
 			}
 		}

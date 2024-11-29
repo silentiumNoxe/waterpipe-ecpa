@@ -8,17 +8,19 @@ import (
 )
 
 type request struct {
+	id        uint32
 	opcode    Opcode
-	otp       uint32
 	clusterId byte
+	otp       uint32
 	replicaId uint32
-	offsetId  uint32
 	payload   []byte
 }
 
 func (r request) Length() int {
 	return len(r.payload)
 }
+
+// here I should wait for all segments. When all segments arrived then we can process it
 
 func (c *Cluster) OnMessage(message []byte) {
 	var req = parse(message)
@@ -48,19 +50,19 @@ func (c *Cluster) OnMessage(message []byte) {
 	}
 	if req.opcode == MessageOpcode {
 		if err := c.processMessageOpcode(req); err != nil {
-			c.log.Warn("Fail process message", "err", err, "opcode", req.opcode, "offset", req.offsetId)
+			c.log.Warn("Fail process message", "err", err, "opcode", req.opcode)
 		}
 		return
 	}
 	if req.opcode == SyncOpcode {
 		if err := c.processSyncOpcode(req); err != nil {
-			c.log.Warn("Fail process message", "err", err, "opcode", req.opcode, "offset", req.offsetId)
+			c.log.Warn("Fail process message", "err", err, "opcode", req.opcode)
 		}
 		return
 	}
 	if req.opcode == SyncEchoOpcode {
 		if err := c.processSyncEchoOpcode(req); err != nil {
-			c.log.Warn("Fail process message", "err", err, "opcode", req.opcode, "offset", req.offsetId)
+			c.log.Warn("Fail process message", "err", err, "opcode", req.opcode)
 		}
 		return
 	}
@@ -74,7 +76,7 @@ func parse(message []byte) *request {
 	r.clusterId = message[1]
 	r.otp = binary.BigEndian.Uint32(message[2:6])
 	r.replicaId = binary.BigEndian.Uint32(message[6:10])
-	r.offsetId = binary.BigEndian.Uint32(message[10:14])
+	r
 	r.payload = message[14:]
 	return &r
 }

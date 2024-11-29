@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/binary"
@@ -87,31 +88,67 @@ func (c *Cluster) Store(message []byte) error {
 		return fmt.Errorf("unable to generate otp: %w", err)
 	}
 
-	c.broadcast(peers, &request{opcode: MessageOpcode, offsetId: msg.Id(), payload: msg.Checksum()}, otp)
+	var payload = &bytes.Buffer{}
+	err = binary.Write(payload, binary.BigEndian, msg.Id())
+	if err != nil {
+		return err
+	}
+	payload.Write(msg.Checksum())
+
+	c.broadcast(peers, &request{opcode: MessageOpcode, payload: payload.Bytes()}, otp)
 
 	return nil
 }
 
+// broadcast send to each peer the request. Max payload size 512 bytes, if payload will be more than
+// broadcast will split payload to segments and send it separately
 func (c *Cluster) broadcast(peers []sm.Peer, req *request, otp uint32) {
-	var message = make([]byte, req.Length()+1+1+4+4+4)
-	message[0] = byte(req.opcode)
-	message[1] = c.clusterId
-	binary.BigEndian.PutUint32(message[2:6], otp)
-	binary.BigEndian.PutUint32(message[6:10], c.replicaId)
-	binary.BigEndian.PutUint32(message[10:14], req.offsetId)
-	copy(message[14:], req.payload)
+	const maxSize = 512
+	const headerSize = 64
+	const payloadSize = maxSize - headerSize
+
+	var segments = make([][]byte, 0)
+
+	var id = time.Now().UnixMilli()
+	var r = bytes.NewReader(req.payload)
+
+	for i := 0; true; i++ {
+		var meta = make([]byte, 64)
+		meta[0] = byte(req.opcode)
+		meta[1] = c.clusterId
+		binary.BigEndian.PutUint32(meta[2:6], otp)
+		binary.BigEndian.PutUint32(meta[6:10], c.replicaId)
+		binary.BigEndian.PutUint64(meta[10:18], uint64(id))
+		binary.BigEndian.PutUint32(meta[18:22], uint32(i))
+
+		var data = make([]byte, payloadSize)
+		n, err := r.Read(data)
+		if err != nil {
+			c.log.Warn("Failed to read payload", "err", err)
+			return
+		}
+
+		if n == 0 {
+			break
+		}
+
+		var msg = make([]byte, maxSize)
+		copy(msg[:headerSize], meta)
+		copy(msg[headerSize:], data)
+
+		segments = append(segments, msg)
+
+		if n < payloadSize {
+			break
+		}
+	}
 
 	for _, peer := range peers {
-		c.wg.Add(1)
-
-		go func(addr string, payload []byte) {
-			defer c.wg.Done()
-
-			err := publish(addr, payload)
-			if err != nil {
-				c.log.Warn("Failed sending message", "err", err)
+		for i, seg := range segments {
+			if err := publish(peer.Addr, seg); err != nil {
+				c.log.Warn("Failed sending message", "err", err, "segment", i)
 			}
-		}(peer.Addr, message[:]) //todo: slice or array?
+		}
 	}
 }
 
