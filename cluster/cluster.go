@@ -139,7 +139,9 @@ func (c *Cluster) broadcast(peers []sm.Peer, req *request, otp uint32) {
 			break
 		}
 
-		var msg = make([]byte, maxSize)
+		meta.Reset()
+
+		var msg = make([]byte, headerSize+n)
 		copy(msg[:headerSize], meta.Bytes())
 		copy(msg[headerSize:], data)
 

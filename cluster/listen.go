@@ -91,6 +91,7 @@ func auth(otp uint32, secret []byte) error {
 }
 
 func (c *Cluster) OnMessage(message []byte) {
+	c.log.Info(fmt.Sprintf("Received message %v", message))
 	req, err := parse(message)
 	if err != nil {
 		c.log.Warn("Unable to parse message", "err", err)
