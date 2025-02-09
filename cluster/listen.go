@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/silentiumNoxe/waterpipe-ecpa/sm"
+	"waterpipe-ecpa/sm"
 )
 
 type request struct {

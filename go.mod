@@ -1,3 +1,3 @@
-module github.com/silentiumNoxe/waterpipe-ecpa
+module waterpipe-ecpa
 
 go 1.23

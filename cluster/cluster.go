@@ -6,12 +6,12 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/silentiumNoxe/waterpipe-ecpa/sm"
 	"log/slog"
 	"math"
 	"net"
 	"sync"
 	"time"
+	"waterpipe-ecpa/sm"
 )
 
 type Opcode byte
