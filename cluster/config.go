@@ -1,10 +1,10 @@
 package cluster
 
 import (
+	"github.com/silentiumNoxe/waterpipe-ecpa/sm"
 	"log/slog"
 	"net"
 	"sync"
-	"waterpipe-ecpa/sm"
 )
 
 type Config struct {
