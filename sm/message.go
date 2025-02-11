@@ -3,6 +3,7 @@ package sm
 import (
 	"encoding/hex"
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -12,38 +13,38 @@ type Message struct {
 	checksum  []byte
 	state     State
 	timestamp time.Time
-	quorum    int
+	quorum    *atomic.Uint32
 }
 
 func NewMessage(id uint32, data []byte, checksum []byte, state State, timestamp time.Time) Message {
-	return Message{id, data, checksum, state, timestamp, 0}
+	return Message{id, data, checksum, state, timestamp, &atomic.Uint32{}}
 }
 
-func (m Message) Id() uint32 {
+func (m *Message) Id() uint32 {
 	return m.id
 }
 
-func (m Message) Data() []byte {
+func (m *Message) Data() []byte {
 	return m.data
 }
 
-func (m Message) Checksum() []byte {
+func (m *Message) Checksum() []byte {
 	return m.checksum
 }
 
-func (m Message) State() State {
+func (m *Message) State() State {
 	return m.state
 }
 
-func (m Message) Timestamp() time.Time {
+func (m *Message) Timestamp() time.Time {
 	return m.timestamp
 }
 
-func (m Message) IsCommitted() bool {
+func (m *Message) IsCommitted() bool {
 	return m.state == CommittedState
 }
 
-func (m Message) String() string {
+func (m *Message) String() string {
 	return fmt.Sprintf(
 		"{offset: %d, data: %s, checksum: %s, state: %d, timestamp: %v}",
 		m.id,

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -31,7 +32,7 @@ func (sm *StateMachine) Prepare(message []byte) (*Message, error) {
 		return nil, err
 	}
 	offset++
-	msg := &Message{offset, message, checksum(message), PreparedState, time.Now(), 0}
+	msg := &Message{offset, message, checksum(message), PreparedState, time.Now(), new(atomic.Uint32)}
 	sm.mux.Lock()
 	sm.m[offset] = msg
 	sm.mux.Unlock()
@@ -46,20 +47,22 @@ func (sm *StateMachine) Accept(id uint32, checksum []byte) (bool, error) {
 	msg, ok := sm.m[id]
 	sm.mux.RUnlock()
 	if ok {
-		msg.quorum++
-		sm.log.Info(
+		var qv = msg.quorum.Add(1)
+		sm.log.Debug(
 			"[SM] Increase quorum counter",
 			"offset",
 			id,
 			"quorum",
-			fmt.Sprintf("%d/%d", msg.quorum, sm.Quorum()),
+			fmt.Sprintf("%d/%d", qv, sm.Quorum()),
 		)
-		return msg.quorum >= sm.Quorum(), nil
+		return qv >= sm.Quorum(), nil
 	}
 
-	sm.log.Info("[SM] Accept message", "offset", id, "quorum", fmt.Sprintf("%d/%d", 1, sm.Quorum()))
+	sm.log.Debug("[SM] Accept message", "offset", id, "quorum", fmt.Sprintf("%d/%d", 1, sm.Quorum()))
 	sm.mux.Lock()
-	sm.m[id] = &Message{id, nil, checksum, AcceptedState, time.Now(), 1}
+	var qv = new(atomic.Uint32)
+	qv.Store(1)
+	sm.m[id] = &Message{id, nil, checksum, AcceptedState, time.Now(), qv}
 	sm.mux.Unlock()
 	return false, nil
 }
@@ -73,7 +76,7 @@ func (sm *StateMachine) Apply(id uint32, message []byte) error {
 		return fmt.Errorf("message not found offset=%d", id)
 	}
 
-	if msg.quorum < sm.Quorum() {
+	if msg.quorum.Load() < sm.Quorum() {
 		return fmt.Errorf(
 			"wrong state of message, quorum less then required offset=%s",
 			fmt.Sprintf("%d/%d", msg.quorum, sm.Quorum()),
@@ -102,14 +105,14 @@ func (sm *StateMachine) Commit(id uint32) error {
 		return fmt.Errorf("message not found offset=%d", id)
 	}
 
-	if msg.quorum < sm.Quorum() {
+	if msg.quorum.Load() < sm.Quorum() {
 		return fmt.Errorf(
 			"wrong state of message, quorum less then required offset=%s",
 			fmt.Sprintf("%d/%d", msg.quorum, sm.Quorum()),
 		)
 	}
 
-	sm.log.Info("[SM] Commit message", "offset", id)
+	sm.log.Debug("[SM] Commit message", "offset", id)
 	msg.state = CommittedState
 	err := sm.db.Update(id, msg)
 	if err != nil {
@@ -212,8 +215,8 @@ func (sm *StateMachine) AddPeer(id uint32, addr string) bool {
 	return false
 }
 
-func (sm *StateMachine) Quorum() int {
-	return int(math.Ceil(float64(len(sm.peers)+1) / float64(2)))
+func (sm *StateMachine) Quorum() uint32 {
+	return uint32(math.Ceil(float64(len(sm.peers)+1) / float64(2)))
 }
 
 func checksum(src []byte) []byte {

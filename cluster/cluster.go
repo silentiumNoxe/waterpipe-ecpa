@@ -1,10 +1,10 @@
 package cluster
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"github.com/silentiumNoxe/waterpipe-ecpa/sm"
 	"log/slog"
@@ -30,12 +30,7 @@ type Cluster struct {
 	replicaId uint32
 	addr      *net.UDPAddr
 
-	out Outcome
-
 	state *sm.StateMachine
-
-	wait time.Duration
-	port string
 
 	log    *slog.Logger
 	wg     *sync.WaitGroup
@@ -44,52 +39,70 @@ type Cluster struct {
 	secret []byte
 }
 
-func New(cfg *Config) *Cluster {
-	if cfg.Logger == nil {
-		cfg.Logger = slog.Default()
-	}
-	s := sm.New(cfg.DB, cfg.Logger)
-	for id, addr := range cfg.Peers {
-		s.AddPeer(id, addr)
+func (c *Cluster) SyncStore(ctx context.Context, message []byte) (uint32, error) {
+	if _, ok := ctx.Deadline(); ok {
+		return 0, fmt.Errorf("deadline not set")
 	}
 
-	secret, err := hex.DecodeString(cfg.Secret)
+	off, err := c.AsyncStore(message)
 	if err != nil {
-		panic(fmt.Errorf("Failed to decode secret: %w ", err))
+		return off, err
 	}
 
-	return &Cluster{
-		clusterId: cfg.ClusterId,
-		replicaId: cfg.ReplicaId,
-		addr:      cfg.Addr,
-		out:       cfg.Out,
-		state:     s,
-		port:      cfg.Port,
-		wg:        cfg.WaitGroup,
-		log:       cfg.Logger,
-		secret:    secret,
+	t := time.NewTicker(time.Millisecond * 30)
+	defer t.Stop()
+
+	criteria := sm.LookupCriteria{OffsetIds: []uint32{off}}
+
+	for {
+		select {
+		case <-t.C:
+			result, err := c.state.Lookup(criteria)
+			if err != nil {
+				slog.Warn("Unable to lookup message", slog.String("err", err.Error()))
+				continue
+			}
+
+			if len(result) == 0 {
+				return off, fmt.Errorf("message not found")
+			}
+
+			if result[0].IsCommitted() {
+				return off, nil
+			}
+		case <-ctx.Done():
+			err = c.Rollback(off)
+			if err != nil {
+				return off, err
+			}
+		}
 	}
 }
 
-func (c *Cluster) Store(message []byte) error {
+func (c *Cluster) AsyncStore(message []byte) (uint32, error) {
 	msg, err := c.state.Prepare(message)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	peers := c.state.Peers()
 	if len(peers) == 0 {
-		return fmt.Errorf("cluster not ready yet, no peers")
+		return msg.Id(), fmt.Errorf("cluster not ready yet, no peers")
 	}
 
 	otp, err := genTOTP(c.secret, 20, 8)
 	if err != nil {
-		return fmt.Errorf("unable to generate otp: %w", err)
+		return msg.Id(), fmt.Errorf("unable to generate otp: %w", err)
 	}
 
 	c.broadcast(peers, &request{opcode: MessageOpcode, offsetId: msg.Id(), payload: msg.Checksum()}, otp)
 
-	return nil
+	return msg.Id(), nil
+}
+
+func (c *Cluster) Rollback(offsetId uint32) error {
+	//todo: implement me
+	panic("implement me")
 }
 
 func (c *Cluster) broadcast(peers []sm.Peer, req *request, otp uint32) {

@@ -7,16 +7,22 @@ import (
 	"sync"
 )
 
+func DefaultConfig(replica uint32, secret string) *Config {
+	return &Config{
+		ClusterId: 1,
+		ReplicaId: replica,
+		Addr:      &net.UDPAddr{IP: net.ParseIP("0.0.0.0"), Port: 9000},
+		Peers:     make(map[uint32]string),
+		Secret:    secret,
+	}
+}
+
 type Config struct {
 	// ClusterId separate replicas by cluster
 	ClusterId byte
 
 	// ReplicaId server id in cluster network
 	ReplicaId uint32
-
-	// Out
-	// Deprecated
-	Out Outcome
 
 	// DB Database of messages in cluster
 	DB sm.MessageDB
@@ -29,12 +35,8 @@ type Config struct {
 	// server will ping peers with heathbeat. This action register the server in cluster for other members
 	Peers map[uint32]string
 
-	// Port
-	// Deprecated
-	Port string
-
 	// WaitGroup cluster uses goroutines. Required for graceful shut down
-	WaitGroup *sync.WaitGroup
+	WaitGroup *sync.WaitGroup //todo: need default value
 
 	// Logger set for customization logging
 	Logger *slog.Logger
